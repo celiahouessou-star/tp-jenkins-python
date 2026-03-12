@@ -6,7 +6,6 @@ pipeline {
     }
 
     stages {
-
         stage('Install') {
             steps {
                 echo 'Installation des dépendances'
@@ -27,6 +26,5 @@ pipeline {
                 sh 'pytest'
             }
         }
-
     }
 }

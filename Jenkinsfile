@@ -1,29 +1,54 @@
 pipeline {
-    agent {
-        docker {
-            image 'python:3.10'
-        }
+    agent any
+
+    environment {
+        IMAGE_NAME = 'celia2000/tp-jenkins-python'
     }
 
     stages {
-        stage('Install') {
+
+        stage('Checkout') {
             steps {
-                echo 'Installation des dépendances'
-                sh 'pip install -r requirements.txt'
+                checkout scm
             }
         }
 
-        stage('Run Script') {
+        stage('Tests Python') {
             steps {
-                echo 'Exécution du script Python'
-                sh 'python app.py'
+                script {
+                    docker.image('python:3.10').inside('-u 0:0') {
+                        sh 'pip install -r requirements.txt'
+                        sh 'python app.py'
+                        sh 'pytest'
+                    }
+                }
             }
         }
 
-        stage('Tests') {
+        stage('Build Docker Image') {
             steps {
-                echo 'Lancement des tests'
-                sh 'pytest'
+                sh 'docker build -t $IMAGE_NAME:latest .'
+            }
+        }
+
+        stage('Login DockerHub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh 'echo $PASS | docker login -u $USER --password-stdin'
+                }
+            }
+        }
+
+        stage('Push Image') {
+            steps {
+                sh 'docker push $IMAGE_NAME:latest'
+            }
+        }
+
+        stage('Deploy Test') {
+            steps {
+                sh 'docker rm -f test-python || true'
+                sh 'docker run -d --name test-python $IMAGE_NAME:latest'
             }
         }
     }
